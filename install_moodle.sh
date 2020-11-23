@@ -99,6 +99,15 @@ phpmyadmin () {
 
 
 
+url() {
+    pub_ip=`curl ifconfig.me`
+    echo 
+    echo "http://$pub_ip/moodle"
+    echo
+    echo "http://$pub_ip/phpmyadmin"
+}
+
+
 
 ########################
 apache_php
@@ -107,5 +116,5 @@ moodle
 mysql_config
 moodle_db $db_root_password
 phpmyadmin
-
+url
 
