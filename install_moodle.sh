@@ -67,12 +67,13 @@ moodle () {
     && sudo cp -R /opt/moodle /var/www/html/ \
     && sudo mkdir /var/moodledata \
     && sudo chown -R www-data /var/moodledata \
+    && sudo chown -R www-data:www-data /var/www/html/moodle \
     && sudo chmod -R 777 /var/moodledata \
     && sudo chmod -R 0775 /var/www/html/moodle
 }
 
 
-# updating default storage engine type to innodb and backup the config file.
+# updating mysql default storage engine type to innodb and backup the config file.
 mysql_config () {
     config_file=/etc/mysql/mysql.conf.d/mysqld.cnf
     sudo sed -i.bakup_`date +%F`-`date +%T` '/\[mysqld\]/a default_storage_engine = innodb\ninnodb_file_per_table = 1' $config_file
@@ -81,7 +82,7 @@ mysql_config () {
 
 
 
-# moodle db configuration and run mysql quries
+# Creating moodle Database
 moodle_db () {
     pass=$1
     mysql -u root -p$pass -e\
@@ -99,12 +100,17 @@ phpmyadmin () {
 
 
 
-url() {
+info () {
     pub_ip=`curl ifconfig.me`
     echo 
     echo "http://$pub_ip/moodle"
     echo
     echo "http://$pub_ip/phpmyadmin"
+    echo
+    echo "moodle Data Directory: /var/moodledata"
+    echo "moodle DB: $moodle_db"
+    echo "moodle DB user: $moodle_db_user"
+    echo "moodle DB user pass: $moodle_db_pass"
 }
 
 
@@ -116,5 +122,5 @@ moodle
 mysql_config
 moodle_db $db_root_password
 phpmyadmin
-url
+info
 
