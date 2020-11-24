@@ -202,7 +202,9 @@ phpmyadminSsl () {
 # Configure php access from specific ips
 phpmyadminConfig () {
     file="/etc/apache2/conf-enabled/phpmyadmin.conf"
-    sudo sed -i.bakup_`date +%F`-`date +%T` '[\<Directory /usr/share/phpmyadmin>[a    Order Deny,Allow\n    Deny from All\n    Allow from 10.1.3.0/24\n    Allow from 192.168.16.0/24\n    Allow from 10.1.4.0/24' $file
+    sudo sed -i.bakup_`date +%F`-`date +%T` '/\<Directory \/usr\/share\/phpmyadmin\>/a    \
+    Order Deny,Allow\n    Deny from All\n    Allow from 10.1.3.0/24\n    \
+    Allow from 192.168.16.0/24\n    Allow from 10.1.4.0/24' $file
 }
 
 
