@@ -30,14 +30,15 @@ apt-get update -y  \
 
 
 # restart services
-restart () {
+restartService () {
+#FIXME: please rename to a non reserved function name e.g. restartService()
     service=$1
     sudo systemctl restart $service
     status "$?"
 }
 
 # Apache and php deppendencies installation
-apache_php () {
+installApachePhp () {
     sudo apt-get install -y apache2 php libapache2-mod-php \
     && sudo apt-get install -y graphviz aspell ghostscript \
     clamav php7.4-pspell php7.4-curl php7.4-gd php7.4-intl \
@@ -48,22 +49,33 @@ apache_php () {
 
 
 # mysql installation and password setup
-mysql_installation () {
+installMysql () {
     export DEBIAN_FRONTEND="noninteractive"
     debconf-set-selections <<< "mysql-server mysql-server/root_password password $db_root_password"
     debconf-set-selections <<< "mysql-server mysql-server/root_password_again password $db_root_password"
     apt-get install mysql-server -y
 }
 
+# updating mysql default storage engine type to innodb and backup the config file.
+configureMysql () {
+    config_file=/etc/mysql/mysql.conf.d/mysqld.cnf
+    sudo sed -i.bakup_`date +%F`-`date +%T` '/\[mysqld\]/a default_storage_engine = innodb\ninnodb_file_per_table = 1' $config_file
+    restartService mysql
+}
 
 # moodle download and installation
-moodle () {
+gitCloneMoodleSources () {
+#FIXME: rename gitCloneMoodleSources()
     cd /opt \
     && sudo git clone git://git.moodle.org/moodle.git \
     && cd moodle \
     && sudo git branch -a \
     && sudo git branch --track MOODLE_39_STABLE origin/MOODLE_39_STABLE \
     && sudo git checkout MOODLE_39_STABLE \
+}
+
+configureApacheWebContent() {
+# FIXME, extract this into configureApacheWebContent()
     && sudo cp -R /opt/moodle /var/www/html/ \
     && sudo mkdir /var/moodledata \
     && sudo chown -R www-data /var/moodledata \
@@ -73,17 +85,9 @@ moodle () {
 }
 
 
-# updating mysql default storage engine type to innodb and backup the config file.
-mysql_config () {
-    config_file=/etc/mysql/mysql.conf.d/mysqld.cnf
-    sudo sed -i.bakup_`date +%F`-`date +%T` '/\[mysqld\]/a default_storage_engine = innodb\ninnodb_file_per_table = 1' $config_file
-    restart mysql
-}
-
-
-
 # Creating moodle Database
-moodle_db () {
+createDbMoodle () {
+#FIXME: please rename to createDbMoodle()
     pass=$1
     mysql -u root -p$pass -e\
     "CREATE DATABASE $moodle_db DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci; \
@@ -92,35 +96,60 @@ moodle_db () {
 }
 
 
+# install moodle from cli
+installMoodle () {
+    sudo -u www-data /var/www/html/moodle/admin/cli/php install.php
+}
+
+
 # install phpmyadmin
-phpmyadmin () {
+installPhpmyadmin () {
+#FIXME: rename to installPhpmyadmin()
     sudo apt install -y  phpmyadmin php-mbstring php-zip php-gd php-json php-curl \
     && sudo phpenmod mbstring
 }
 
 
+  # by default only security updates are applied
+setup_autoupdates(){
 
+  apt-get install -y unattended-upgrades
+
+  sed -i.save 's/^[\/]*Unattended-Upgrade::Remove-Unused-Kernel-Packages .*/Unattended-Upgrade::Remove-Unused-Kernel-Packages "true";/' /etc/apt/apt.conf.d/50unattended-upgrades
+  sed -i.save 's/^[\/]*Unattended-Upgrade::Remove-New-Unused-Dependencies .*/Unattended-Upgrade::Remove-New-Unused-Dependencies "true";/' /etc/apt/apt.conf.d/50unattended-upgrades
+  sed -i.save 's/^[\/]*Unattended-Upgrade::Remove-Unused-Dependencies .*/Unattended-Upgrade::Remove-Unused-Dependencies "true";/' /etc/apt/apt.conf.d/50unattended-upgrades
+  sed -i.save 's/^[\/]*Unattended-Upgrade::Automatic-Reboot .*/Unattended-Upgrade::Automatic-Reboot "false";/' /etc/apt/apt.conf.d/50unattended-upgrades
+  sed -i.save 's/^[\/]*Unattended-Upgrade::Automatic-Reboot-Time .*/Unattended-Upgrade::Automatic-Reboot-Time "02:00";/' /etc/apt/apt.conf.d/50unattended-upgrades
+}
+
+
+
+
+
+# information to configure in browser
 info () {
     pub_ip=`curl ifconfig.me`
-    echo 
-    echo "http://$pub_ip/moodle"
-    echo
-    echo "http://$pub_ip/phpmyadmin"
-    echo
-    echo "moodle Data Directory: /var/moodledata"
-    echo "moodle DB: $moodle_db"
-    echo "moodle DB user: $moodle_db_user"
-    echo "moodle DB user pass: $moodle_db_pass"
+    echo "################################################" 
+    echo "# Moodle URL: http://$pub_ip/moodle"
+    echo "# "
+    echo "# phpmyadmin URL: http://$pub_ip/phpmyadmin"
+    echo "# "
+    echo "# Moodle Data Directory: /var/moodledata"
+    echo "# Moodle DB: $moodle_db"
+    echo "# Moodle DB user: $moodle_db_user"
+    echo "# Moodle DB user pass: $moodle_db_pass"
+    echo "################################################"
 }
 
 
 
 ########################
-apache_php
-mysql_installation
-moodle
-mysql_config
-moodle_db $db_root_password
-phpmyadmin
+installApachePhp
+installMysql
+gitCloneMoodleSources
+configureApacheWebContent
+configureMysql
+createDbMoodle $db_root_password
+installPhpmyadmin
 info
 
