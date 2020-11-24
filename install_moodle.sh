@@ -27,6 +27,7 @@ moodle_admin_email="admin@email.com"
 # SSL
 # SSL certificated configured only if SSL variable set to TRUE other wise configuration will set to public ip
 # If SSL set True make sure FQDN dns configured other wise letsecrypt fail to install ssl certificates
+# Condition
 ssl="False" 
 
 # Domain
@@ -60,7 +61,6 @@ restartService () {
 #FIXME: please rename to a non reserved function name e.g. restartService()
     service=$1
     sudo systemctl restart $service
-    status "$?"
 }
 
 # Apache and php deppendencies installation
@@ -126,7 +126,7 @@ createDbMoodle () {
 installMoodle () {
     sudo -u www-data php /var/www/html/moodle/admin/cli/install.php --wwwroot="http://$domain" \
     --dataroot='/var/moodledata' --dbuser="$moodle_db_user" --dbpass="$moodle_db_pass" \
-#    --adminname="$moodle_admin_name" --adminpass="$moodle_admin_pass" --adminemail="$moodle_admin_email" \
+    --adminname="$moodle_admin_name" --adminpass="$moodle_admin_pass" --adminemail="$moodle_admin_email" \
     --non-interactive --agree-license
 }
 
@@ -191,6 +191,28 @@ letsencrypt () {
     && sudo certbot --apache -d $domain
 }
 
+# Enable ssl for php
+phpmyadminSsl () {
+    echo "Include /etc/phpmyadmin/apache.conf" | tee -a /etc/apache2/apache2.conf
+    sudo a2enmod ssl
+    echo "\$cfg['ForceSSL'] = true;" | tee -a /etc/phpmyadmin/config.inc.php
+    restartService apache2
+}
+
+
+# Configure php access from specific ips
+phpmyadminConfig () {
+    file="/etc/apache2/conf.d/phpmyadmin.conf"
+    sudo sed -i.bakup_`date +%F`-`date +%T` '%\<Directory /usr/share/phpmyadmin>%a \
+    Order Deny,Allow\n
+    Deny from All
+    Allow from 10.1.3.0/24
+    Allow from 192.168.16.0/24
+    Allow from 10.1.4.0/24' $file
+}
+
+
+
 
 
 # information to configure in browser
@@ -216,12 +238,14 @@ gitCloneMoodleSources
 configureApacheWebContent
 configureMysql
 createDbMoodle $db_root_password
+installMoodle
 installPhpmyadmin
 setup_autoupdates
 apacheVirtualhost
-if [ $ssl == "True"]
+if [ $ssl == "True" ]
 then
     letsencrypt
 fi
+phpmyadminSsl
 info
 
