@@ -124,7 +124,7 @@ createDbMoodle () {
 
 # install moodle from cli
 installMoodle () {
-    sudo -u www-data php /var/www/html/moodle/admin/cli/install.php --wwwroot="http://$domain" \
+    sudo -u www-data php /var/www/html/moodle/admin/cli/install.php --wwwroot="https://$domain" \
     --dataroot='/var/moodledata' --dbname="$moodle_db" --dbuser="$moodle_db_user" --dbpass="$moodle_db_pass" \
     --fullname="$moodle_web_name" --shortname="$moodle_web_short_name" --summary="$moodle_web_summary" \
     --adminuser="$moodle_admin_name" --adminpass="$moodle_admin_pass" --adminemail="$moodle_admin_email" \
@@ -186,9 +186,7 @@ apacheVirtualhost () {
 
 # certbot installation and installing ssl certs on $domain
 letsencrypt () {
-    sudo snap install core; sudo snap refresh core \
-    && sudo snap install --classic certbot \
-    && sudo ln -s /snap/bin/certbot /usr/bin/certbot \
+    sudo apt-get install -y certbot python3-certbot-apache \
     && sudo certbot --apache -d $domain
 }
 
@@ -204,12 +202,7 @@ phpmyadminSsl () {
 # Configure php access from specific ips
 phpmyadminConfig () {
     file="/etc/apache2/conf-enabled/phpmyadmin.conf"
-    sudo sed -i.bakup_`date +%F`-`date +%T` '%\<Directory /usr/share/phpmyadmin>%a \
-    Order Deny,Allow\n
-    Deny from All
-    Allow from 10.1.3.0/24
-    Allow from 192.168.16.0/24
-    Allow from 10.1.4.0/24' $file
+    sudo sed -i.bakup_`date +%F`-`date +%T` '[\<Directory /usr/share/phpmyadmin>[a    Order Deny,Allow\n    Deny from All\n    Allow from 10.1.3.0/24\n    Allow from 192.168.16.0/24\n    Allow from 10.1.4.0/24' $file
 }
 
 
