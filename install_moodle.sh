@@ -216,6 +216,7 @@ gitCloneMoodleSources
 configureApacheWebContent
 configureMysql
 createDbMoodle $db_root_password
+installMoodle
 installPhpmyadmin
 setup_autoupdates
 apacheVirtualhost
