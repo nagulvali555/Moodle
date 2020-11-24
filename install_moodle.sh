@@ -44,7 +44,7 @@ fi
 # if ssl not true then set domain to public ip
 if [ $ssl != "True" ]
 then
-    domain="$(curl ifconfig.me)"
+    domain="$(curl -sSL ifconfig.me)"
 fi
 
 # Ask value for mysql root password
@@ -125,8 +125,9 @@ createDbMoodle () {
 # install moodle from cli
 installMoodle () {
     sudo -u www-data php /var/www/html/moodle/admin/cli/install.php --wwwroot="http://$domain" \
-    --dataroot='/var/moodledata' --dbuser="$moodle_db_user" --dbpass="$moodle_db_pass" \
-    --adminname="$moodle_admin_name" --adminpass="$moodle_admin_pass" --adminemail="$moodle_admin_email" \
+    --dataroot='/var/moodledata' --dbname="$moodle_db" --dbuser="$moodle_db_user" --dbpass="$moodle_db_pass" \
+    --fullname="$moodle_web_name" --shortname="$moodle_web_short_name" --summary="$moodle_web_summary" 
+    --adminuser="$moodle_admin_name" --adminpass="$moodle_admin_pass" --adminemail="$moodle_admin_email" \
     --non-interactive --agree-license
 }
 
@@ -202,7 +203,7 @@ phpmyadminSsl () {
 
 # Configure php access from specific ips
 phpmyadminConfig () {
-    file="/etc/apache2/conf.d/phpmyadmin.conf"
+    file="/etc/apache2/conf-enabled/phpmyadmin.conf"
     sudo sed -i.bakup_`date +%F`-`date +%T` '%\<Directory /usr/share/phpmyadmin>%a \
     Order Deny,Allow\n
     Deny from All
@@ -247,5 +248,6 @@ then
     letsencrypt
 fi
 phpmyadminSsl
+phpmyadminConfig
 info
 
