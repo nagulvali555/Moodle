@@ -60,7 +60,6 @@ restartService () {
 #FIXME: please rename to a non reserved function name e.g. restartService()
     service=$1
     sudo systemctl restart $service
-    status "$?"
 }
 
 # Apache and php deppendencies installation
@@ -220,9 +219,10 @@ installMoodle
 installPhpmyadmin
 setup_autoupdates
 apacheVirtualhost
-if [ $ssl == "True"]
+if [ $ssl == "True" ]
 then
     letsencrypt
 fi
+phpmyadminSsl
 info
 
