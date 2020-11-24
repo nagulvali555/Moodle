@@ -126,7 +126,7 @@ createDbMoodle () {
 installMoodle () {
     sudo -u www-data php /var/www/html/moodle/admin/cli/install.php --wwwroot="http://$domain" \
     --dataroot='/var/moodledata' --dbname="$moodle_db" --dbuser="$moodle_db_user" --dbpass="$moodle_db_pass" \
-    --fullname="$moodle_web_name" --shortname="$moodle_web_short_name" --summary="$moodle_web_summary" 
+    --fullname="$moodle_web_name" --shortname="$moodle_web_short_name" --summary="$moodle_web_summary" \
     --adminuser="$moodle_admin_name" --adminpass="$moodle_admin_pass" --adminemail="$moodle_admin_email" \
     --non-interactive --agree-license
 }
