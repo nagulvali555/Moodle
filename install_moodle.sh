@@ -11,6 +11,26 @@ moodle_db="moodle"
 moodle_db_user="moodleuser"
 # Moodle database pass
 moodle_db_pass="MoodlePass@123"
+# Website Name
+moodle_web_name="Example"
+# Web short Name
+moodle_web_short_name="example"
+# Web summary
+moodle_web_summary="example website"
+# Admin Name
+moodle_admin_name="admin"
+# Moodle admin pass
+moodle_admin_pass="Admin@123"
+# Moodle Admin Email
+moodle_admin_email="admin@email.com"
+
+# SSL
+# SSL certificated configured only if SSL variable set to TRUE other wise configuration will set to public ip
+# If SSL set True make sure FQDN dns configured other wise letsecrypt fail to install ssl certificates
+ssl="False" 
+
+# Domain
+domain="example.com"
 
 
 
@@ -20,8 +40,14 @@ if [ "$(id -u)" != "0" ]; then
   exit 1
 fi
 
+# if ssl not true then set domain to public ip
+if [ $ssl != "True" ]
+then
+    domain="$(curl ifconfig.me)"
+fi
+
 # Ask value for mysql root password
-read -p 'db_root_password [secretpasswd]: ' db_root_password
+read -sp 'db_root_password [secretpasswd]: ' db_root_password
 echo
 
 # Update system
@@ -71,12 +97,12 @@ gitCloneMoodleSources () {
     && cd moodle \
     && sudo git branch -a \
     && sudo git branch --track MOODLE_39_STABLE origin/MOODLE_39_STABLE \
-    && sudo git checkout MOODLE_39_STABLE \
+    && sudo git checkout MOODLE_39_STABLE
 }
 
 configureApacheWebContent() {
 # FIXME, extract this into configureApacheWebContent()
-    && sudo cp -R /opt/moodle /var/www/html/ \
+    sudo cp -R /opt/moodle /var/www/html/ \
     && sudo mkdir /var/moodledata \
     && sudo chown -R www-data /var/moodledata \
     && sudo chown -R www-data:www-data /var/www/html/moodle \
@@ -98,14 +124,17 @@ createDbMoodle () {
 
 # install moodle from cli
 installMoodle () {
-    sudo -u www-data /var/www/html/moodle/admin/cli/php install.php
+    sudo -u www-data php /var/www/html/moodle/admin/cli/install.php --wwwroot="http://$domain" \
+    --dataroot='/var/moodledata' --dbuser="$moodle_db_user" --dbpass="$moodle_db_pass" \
+#    --adminname="$moodle_admin_name" --adminpass="$moodle_admin_pass" --adminemail="$moodle_admin_email" \
+    --non-interactive --agree-license
 }
 
 
 # install phpmyadmin
 installPhpmyadmin () {
 #FIXME: rename to installPhpmyadmin()
-    sudo apt install -y  phpmyadmin php-mbstring php-zip php-gd php-json php-curl \
+    sudo apt-get install -y  phpmyadmin php-mbstring php-zip php-gd php-json php-curl \
     && sudo phpenmod mbstring
 }
 
@@ -123,21 +152,58 @@ setup_autoupdates(){
 }
 
 
+# apache config redirection will auto set by letsencrypt
+apacheVirtualhost () {
+
+    dir="/etc/apache2/sites-available/"
+    echo "
+<VirtualHost *:80>
+  ServerName $domain
+#  ServerAlias www.$domain
+  DocumentRoot /var/www/html/moodle
+
+  <Directory /var/www/html/moodle>
+     Options FollowSymLinks
+     AllowOverride all
+     Require all granted
+  </Directory>
+
+  ErrorLog ${APACHE_LOG_DIR}/error.log
+  CustomLog ${APACHE_LOG_DIR}/access.log combined
+  #RewriteEngine on
+  #RewriteCond %{SERVER_NAME} =www.$domain [OR]
+  #RewriteCond %{SERVER_NAME} =$domain
+  #RewriteRule ^ https://%{SERVER_NAME}%{REQUEST_URI} [END,NE,R=permanent]
+</VirtualHost>" > "$dir/moodle.conf"
+
+    a2ensite "$dir/moodle.conf"
+    a2dissite "$dir/000-default.conf"
+    a2enmod rewrite
+    restart apache2
+
+}
+
+# certbot installation and installing ssl certs on $domain
+letsencrypt () {
+    sudo snap install core; sudo snap refresh core \
+    && sudo snap install --classic certbot \
+    && sudo ln -s /snap/bin/certbot /usr/bin/certbot
+    && sudo certbot --apache -d $domain
+}
 
 
 
 # information to configure in browser
 info () {
-    pub_ip=`curl ifconfig.me`
     echo "################################################" 
-    echo "# Moodle URL: http://$pub_ip/moodle"
+    echo "# Moodle URL: http://$domain"
     echo "# "
-    echo "# phpmyadmin URL: http://$pub_ip/phpmyadmin"
+    echo "# phpmyadmin URL: http://$domain/phpmyadmin"
     echo "# "
-    echo "# Moodle Data Directory: /var/moodledata"
-    echo "# Moodle DB: $moodle_db"
-    echo "# Moodle DB user: $moodle_db_user"
-    echo "# Moodle DB user pass: $moodle_db_pass"
+    echo "# "
+    echo "# "
+    echo "# "
+    echo "# "
     echo "################################################"
 }
 
@@ -151,5 +217,11 @@ configureApacheWebContent
 configureMysql
 createDbMoodle $db_root_password
 installPhpmyadmin
+setup_autoupdates
+apacheVirtualhost
+if [ $ssl == "True"]
+then
+    letsencrypt
+fi
 info
 
