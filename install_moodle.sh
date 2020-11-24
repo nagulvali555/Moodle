@@ -27,11 +27,11 @@ moodle_admin_email="admin@email.com"
 # SSL
 # SSL certificated configured only if SSL variable set to TRUE other wise configuration will set to public ip
 # If SSL set True make sure FQDN dns configured other wise letsecrypt fail to install ssl certificates
-# Condition
+# letsencrypt will be installed only if ssl set to TRUE (condition added at the end)
 ssl="False" 
 
 # Domain
-domain="example.com"
+domain="moodle.vali.life"
 
 
 
@@ -155,7 +155,7 @@ setup_autoupdates(){
 # apache config redirection will auto set by letsencrypt
 apacheVirtualhost () {
 
-    dir="/etc/apache2/sites-available/"
+    cd /etc/apache2/sites-available
     echo "
 <VirtualHost *:80>
   ServerName $domain
@@ -174,12 +174,12 @@ apacheVirtualhost () {
   #RewriteCond %{SERVER_NAME} =www.$domain [OR]
   #RewriteCond %{SERVER_NAME} =$domain
   #RewriteRule ^ https://%{SERVER_NAME}%{REQUEST_URI} [END,NE,R=permanent]
-</VirtualHost>" > "$dir/moodle.conf"
+</VirtualHost>" > moodle.conf
 
-    a2ensite "$dir/moodle.conf"
-    a2dissite "$dir/000-default.conf"
+    a2ensite moodle.conf
+    a2dissite 000-default.conf
     a2enmod rewrite
-    restart apache2
+    restartService apache2
 
 }
 
@@ -187,7 +187,7 @@ apacheVirtualhost () {
 letsencrypt () {
     sudo snap install core; sudo snap refresh core \
     && sudo snap install --classic certbot \
-    && sudo ln -s /snap/bin/certbot /usr/bin/certbot
+    && sudo ln -s /snap/bin/certbot /usr/bin/certbot \
     && sudo certbot --apache -d $domain
 }
 
