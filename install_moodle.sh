@@ -28,7 +28,7 @@ moodle_admin_email="admin@email.com"
 # SSL certificated configured only if SSL variable set to TRUE other wise configuration will set to public ip
 # If SSL set True make sure FQDN dns configured other wise letsecrypt fail to install ssl certificates
 # letsencrypt will be installed only if ssl set to TRUE (condition added at the end)
-ssl="False" 
+ssl="True" 
 
 # Domain
 domain="moodle.vali.life"
