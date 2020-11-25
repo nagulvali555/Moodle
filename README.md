@@ -1,8 +1,8 @@
 # Moodle Installation Script
 
 #### Pre Requisites:
-FQDN: you can register domain from any domain registrar godady.com or namecheap, etc.
-DNS: Configure DNS or add A record in domain registrar with server public ip/endpoint.
+FQDN: you can register domain from any domain registrar godady.com or namecheap, etc.  
+DNS: Configure DNS or add A record in domain registrar with server public ip/endpoint.  
 #### Below services will be installed as part of script
 * apache2
 * mysql
