@@ -3,8 +3,7 @@
 #########################################
 # Bash script to install and setup moodle
 
-# Variables
-
+## Moodle Variables
 # Moodle database name
 moodle_db="moodle"
 # Moodle database user
@@ -24,16 +23,9 @@ moodle_admin_pass="Admin@123"
 # Moodle Admin Email
 moodle_admin_email="admin@email.com"
 
-# SSL
-# SSL certificated configured only if SSL variable set to TRUE other wise configuration will set to public ip
-# If SSL set True make sure FQDN dns configured other wise letsecrypt fail to install ssl certificates
-# letsencrypt will be installed only if ssl set to TRUE (condition added at the end)
-ssl="True" 
-
-# Domain
-domain="moodle.vali.life"
-
-
+## Lets Encrypt Vars
+ email="nagulvali555@gmail.com"
+ domain="testing.vali.life"
 
 # Check if running as root
 if [ "$(id -u)" != "0" ]; then
@@ -41,17 +33,14 @@ if [ "$(id -u)" != "0" ]; then
   exit 1
 fi
 
-# if ssl not true then set domain to public ip
-if [ $ssl != "True" ]
-then
-    domain="$(curl -sSL ifconfig.me)"
-fi
-
-# Ask value for mysql root password
+# Ask value for mysql root password and php, letsencrypt
 read -sp 'db_root_password [secretpasswd]: ' db_root_password
 echo
+read -sp 'php_myadmin_password [secretpasswd]: ' php_my_admin_pass
+echo
+echo
 
-# Update system
+# Update and Upgrade packages
 apt-get update -y  \
 && apt-get upgrade -y
 
@@ -73,12 +62,11 @@ installApachePhp () {
     && sudo apt install -y git
 }
 
-
 # mysql installation and password setup
 installMysql () {
     export DEBIAN_FRONTEND="noninteractive"
-    debconf-set-selections <<< "mysql-server mysql-server/root_password password $db_root_password"
-    debconf-set-selections <<< "mysql-server mysql-server/root_password_again password $db_root_password"
+    echo "mysql-server mysql-server/root_password password $db_root_password" | debconf-set-selections
+    echo "mysql-server mysql-server/root_password_again password $db_root_password" | debconf-set-selections
     apt-get install mysql-server -y
 }
 
@@ -96,8 +84,9 @@ gitCloneMoodleSources () {
     && sudo git clone git://git.moodle.org/moodle.git \
     && cd moodle \
     && sudo git branch -a \
-    && sudo git branch --track MOODLE_39_STABLE origin/MOODLE_39_STABLE \
-    && sudo git checkout MOODLE_39_STABLE
+    && latest=$(git branch -r | grep -v origin/master | tail -n1 | awk -F "/" '{print $2}') \
+    && sudo git branch --track $latest origin/$latest \
+    && sudo git checkout $latest
 }
 
 configureApacheWebContent() {
@@ -110,7 +99,6 @@ configureApacheWebContent() {
     && sudo chmod -R 0775 /var/www/html/moodle
 }
 
-
 # Creating moodle Database
 createDbMoodle () {
 #FIXME: please rename to createDbMoodle()
@@ -121,7 +109,6 @@ createDbMoodle () {
     GRANT SELECT,INSERT,UPDATE,DELETE,CREATE,CREATE TEMPORARY TABLES,DROP,INDEX,ALTER ON $moodle_db.* TO $moodle_db_user@'localhost';"
 }
 
-
 # install moodle from cli
 installMoodle () {
     sudo -u www-data php /var/www/html/moodle/admin/cli/install.php --wwwroot="https://$domain" \
@@ -131,16 +118,26 @@ installMoodle () {
     --non-interactive --agree-license
 }
 
-
 # install phpmyadmin
 installPhpmyadmin () {
 #FIXME: rename to installPhpmyadmin()
-    sudo apt-get install -y  phpmyadmin php-mbstring php-zip php-gd php-json php-curl \
+#    sudo apt-get install -y  phpmyadmin php-mbstring php-zip php-gd php-json php-curl \
+#    && sudo phpenmod mbstring
+
+    export DEBIAN_FRONTEND=noninteractive
+    echo "phpmyadmin phpmyadmin/reconfigure-webserver multiselect apache2" | debconf-set-selections
+    echo "phpmyadmin phpmyadmin/dbconfig-install boolean true" | debconf-set-selections
+    echo "phpmyadmin phpmyadmin/mysql/admin-user string root" | debconf-set-selections
+    echo "phpmyadmin phpmyadmin/mysql/admin-pass password $db_root_password" | debconf-set-selections
+    echo "phpmyadmin phpmyadmin/mysql/app-pass password $php_my_admin_pass" |debconf-set-selections
+    echo "phpmyadmin phpmyadmin/app-password-confirm password $php_my_admin_pass" | debconf-set-selections
+
+    apt-get install -y phpmyadmin php-mbstring php-zip php-gd php-json php-curl \
     && sudo phpenmod mbstring
 }
 
 
-  # by default only security updates are applied
+# by default only security updates are applied
 setup_autoupdates(){
 
   apt-get install -y unattended-upgrades
@@ -155,6 +152,7 @@ setup_autoupdates(){
 
 # apache config redirection will auto set by letsencrypt
 apacheVirtualhost () {
+    APACHE_LOG_DIR="/var/log/apache2"
 
     cd /etc/apache2/sites-available
     echo "
@@ -169,8 +167,8 @@ apacheVirtualhost () {
      Require all granted
   </Directory>
 
-  ErrorLog ${APACHE_LOG_DIR}/error.log
-  CustomLog ${APACHE_LOG_DIR}/access.log combined
+  ErrorLog /var/log/apache2/error.log
+  CustomLog /var/log/apache2/access.log combined
   #RewriteEngine on
   #RewriteCond %{SERVER_NAME} =www.$domain [OR]
   #RewriteCond %{SERVER_NAME} =$domain
@@ -184,20 +182,19 @@ apacheVirtualhost () {
 
 }
 
-# certbot installation and installing ssl certs on $domain
+# Install certbot and install certificates with redirect from http to https
 letsencrypt () {
     sudo apt-get install -y certbot python3-certbot-apache \
-    && sudo certbot --apache -d $domain
+    && sudo certbot --apache -d $domain -m $email -n --agree-tos --redirect
 }
 
-# Enable ssl for php
+# Enable ssl for phpmyadmin
 phpmyadminSsl () {
     echo "Include /etc/phpmyadmin/apache.conf" | tee -a /etc/apache2/apache2.conf
     sudo a2enmod ssl
     echo "\$cfg['ForceSSL'] = true;" | tee -a /etc/phpmyadmin/config.inc.php
     restartService apache2
 }
-
 
 # Configure php access from specific ips
 phpmyadminConfig () {
@@ -207,24 +204,17 @@ phpmyadminConfig () {
     Allow from 192.168.16.0/24\n    Allow from 10.1.4.0/24' $file
 }
 
-
-
-
-
-# information to configure in browser
+# Display information
 info () {
     echo "################################################" 
-    echo "# Moodle URL: http://$domain"
     echo "# "
-    echo "# phpmyadmin URL: http://$domain/phpmyadmin"
+    echo "# Moodle URL: https://$domain"
     echo "# "
-    echo "# "
-    echo "# "
+    echo "# phpmyadmin URL: https://$domain/phpmyadmin"
     echo "# "
     echo "# "
     echo "################################################"
 }
-
 
 
 ########################
@@ -238,11 +228,10 @@ installMoodle
 installPhpmyadmin
 setup_autoupdates
 apacheVirtualhost
-if [ $ssl == "True" ]
-then
-    letsencrypt
-fi
+letsencrypt
 phpmyadminSsl
 phpmyadminConfig
+restartService mysql
+restartService apache2
 info
 
